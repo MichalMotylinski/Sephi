@@ -20,8 +20,12 @@ def gaia_exoplanets_cross(gaia_filename, crossmatch_dir, save_gaia_id=False, ret
     datasets_dir = "data/initial_datasets"
 
     # Read Exoplanets data
-    exoplanets = pd.read_csv(path.join(datasets_dir, "exoplanets.csv"), skiprows=28,
-                             usecols=["pl_name", "hostname", "gaia_id", "pl_orbper", "pl_orbsmax", "pl_bmasse"])
+    try:
+        exoplanets = pd.read_csv(path.join(datasets_dir, "exoplanets.csv"), skiprows=28,
+                                 usecols=["pl_name", "hostname", "gaia_id", "pl_orbper", "pl_orbsmax", "pl_bmasse"])
+    except ValueError:
+        exoplanets = pd.read_csv(path.join(datasets_dir, "exoplanets.csv"), header=0,
+                                 usecols=["pl_name", "hostname", "gaia_id"])
     # Process Exoplanets data
     exoplanets.dropna(subset=["gaia_id"], inplace=True)
     exoplanets["source_id"] = exoplanets["gaia_id"].str.rsplit(" ", n=1, expand=True)[1].astype("int64")
@@ -57,7 +61,8 @@ def gaia_exoplanets_cross(gaia_filename, crossmatch_dir, save_gaia_id=False, ret
         gaia[["source_id", "Host"]].to_csv(path.join(crossmatch_dir, f"{gaia_filename.split('.')[0]}_star_labels.csv"), index=False)
 
     # Drop all unnecessary data leaving only 6 coordinates, their errors and distance
-    gaia.drop(gaia.columns[:5], axis=1, inplace=True)
+    #gaia.drop(gaia.columns[:5], axis=1, inplace=True)
+    gaia = gaia[["ra", "pmra", "dec", "pmdec", "distance_pc", "radial_velocity"]]
 
     # Save transformed data to a new file
     if save_spherical:
@@ -91,7 +96,7 @@ def transform_to_cart(gaia, table_name, crossmatch_dir, setting="6d", predicted_
 
     if setting == "6d":
         # Convert from spherical to cartesian coordinates [easy]
-        gaia["vx"], gaia["vy"], gaia["vz"] = vsph2cart(gaia["dr2_radial_velocity"], gaia["pmra"], gaia["pmdec"],
+        gaia["vx"], gaia["vy"], gaia["vz"] = vsph2cart(gaia["radial_velocity"], gaia["pmra"], gaia["pmdec"],
                                                        gaia["distance_pc"], gaia["ra"], gaia["dec"])
         gaia.drop(gaia.columns[:-6], axis=1, inplace=True)
     elif setting == "5d_drop_rv":
@@ -99,19 +104,19 @@ def transform_to_cart(gaia, table_name, crossmatch_dir, setting="6d", predicted_
         gaia[["vx", "vy"]]= gaia[["pmra", "pmdec"]]
         gaia.drop(gaia.columns[:-5], axis=1, inplace=True)
     elif setting == "5d_drop_vz":
-        gaia["vx"], gaia["vy"], gaia["vz"] = vsph2cart(gaia["dr2_radial_velocity"], gaia["pmra"], gaia["pmdec"],
+        gaia["vx"], gaia["vy"], gaia["vz"] = vsph2cart(gaia["radial_velocity"], gaia["pmra"], gaia["pmdec"],
                                                        gaia["distance_pc"], gaia["ra"], gaia["dec"])
         gaia.drop(gaia.columns[:-6], axis=1, inplace=True)
         gaia.drop(["vz"], axis=1, inplace=True)
     elif setting == "5d_drop_vy":
         # 5D coords [average]
-        gaia["vx"], gaia["vy"], gaia["vz"] = vsph2cart(gaia["dr2_radial_velocity"], gaia["pmra"], gaia["pmdec"],
+        gaia["vx"], gaia["vy"], gaia["vz"] = vsph2cart(gaia["radial_velocity"], gaia["pmra"], gaia["pmdec"],
                                                        gaia["distance_pc"], gaia["ra"], gaia["dec"])
         gaia.drop(gaia.columns[:-6], axis=1, inplace=True)
         gaia.drop(["vy"], axis=1, inplace=True)
     elif setting == "5d_drop_vx":
         # 5D coords [average]
-        gaia["vx"], gaia["vy"], gaia["vz"] = vsph2cart(gaia["dr2_radial_velocity"], gaia["pmra"], gaia["pmdec"],
+        gaia["vx"], gaia["vy"], gaia["vz"] = vsph2cart(gaia["radial_velocity"], gaia["pmra"], gaia["pmdec"],
                                                        gaia["distance_pc"], gaia["ra"], gaia["dec"])
         gaia.drop(gaia.columns[:-6], axis=1, inplace=True)
         gaia.drop(["vx"], axis=1, inplace=True)
