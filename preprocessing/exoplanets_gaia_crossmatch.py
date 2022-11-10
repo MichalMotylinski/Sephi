@@ -3,7 +3,7 @@ from os import path
 import pandas as pd
 
 
-def gaia_exoplanets_cross(gaia_filename, crossmatch_dir, save_gaia_id=False, return_data=False, save_spherical=True):
+def gaia_exoplanets_cross(gaia_filename, crossmatch_dir, columns, save_gaia_id=False, return_data=False, save_spherical=True):
     """
     Cross match Gaia dataset with NASA exoplanet dataset.
 
@@ -20,34 +20,36 @@ def gaia_exoplanets_cross(gaia_filename, crossmatch_dir, save_gaia_id=False, ret
     datasets_dir = "data/initial_datasets"
 
     # Read Exoplanets data
-    try:
-        exoplanets = pd.read_csv(path.join(datasets_dir, "exoplanets.csv"), skiprows=28,
-                                 usecols=["pl_name", "hostname", "gaia_id", "pl_orbper", "pl_orbsmax", "pl_bmasse"])
-    except ValueError:
-        exoplanets = pd.read_csv(path.join(datasets_dir, "exoplanets.csv"), header=0,
-                                 usecols=["pl_name", "hostname", "gaia_id"])
+    #try:
+        #exoplanets = pd.read_csv(path.join(datasets_dir, "exoplanets.csv"), skiprows=28,
+                                 #usecols=columns)
+    #except ValueError:
+    exoplanets = pd.read_csv(path.join(datasets_dir, "exoplanets.csv"), header=0)
+    
     # Process Exoplanets data
-    exoplanets.dropna(subset=["gaia_id"], inplace=True)
-    exoplanets["source_id"] = exoplanets["gaia_id"].str.rsplit(" ", n=1, expand=True)[1].astype("int64")
-    exoplanets.drop(["gaia_id"], axis=1, inplace=True)
-    exoplanets["Host"] = exoplanets["hostname"].str.replace(" ", "")
-    exoplanets.drop_duplicates(subset=["Host"], inplace=True)
+    #exoplanets.dropna(subset=[columns[2]], inplace=True)
+    #exoplanets["source_id"] = exoplanets[columns[2]].str.rsplit(" ", n=1, expand=True)[1].dropna().astype("int64")
+    #exoplanets.drop([columns[2]], axis=1, inplace=True)
+    #exoplanets["Host"] = exoplanets["hostname"].str.replace(" ", "")
+    #exoplanets.drop_duplicates(subset=["Host"], inplace=True)
 
     # Read Gaia data
     gaia = pd.read_csv(path.join(datasets_dir, gaia_filename))
 
+    # Further reduction of the data
+    gaia = gaia[4.5 < gaia["parallax"] / gaia["parallax_error"]]
+
     # Add Gaia information to Exoplanet hosts
     exoplanets = pd.merge(exoplanets, gaia, on="source_id")
-    exoplanets.drop(["pl_name", "hostname"], axis=1, inplace=True)
+    
 
     # Remove exoplanet hosts from Gaia
     gaia = gaia[~gaia["source_id"].isin(exoplanets["source_id"])]
-    # Further reduction of the data
-    gaia = gaia[4.5 < gaia["parallax"] / gaia["parallax_error"]]
 
     # Concatenate exoplanet hosts back, however at the top of the dataframe. This way for testing purposes we later
     # iterate only over first 1065 entries that are exoplanet hosts.
     gaia = pd.concat([exoplanets, gaia])
+    exoplanets.drop(["pl_name", "host"], axis=1, inplace=True)
 
     # Calculate distance in pc and drop any stars with negative or null distance
     gaia["distance_pc"] = (1. / gaia["parallax"]) * 1000
@@ -58,7 +60,7 @@ def gaia_exoplanets_cross(gaia_filename, crossmatch_dir, save_gaia_id=False, ret
     gaia["dec"] = (gaia["dec"] * np.pi) / 180.
 
     if save_gaia_id:
-        gaia[["source_id", "Host"]].to_csv(path.join(crossmatch_dir, f"{gaia_filename.split('.')[0]}_star_labels.csv"), index=False)
+        gaia[["source_id", "host"]].to_csv(path.join(crossmatch_dir, f"{gaia_filename.split('.')[0]}_star_labels.csv"), index=False)
 
     # Drop all unnecessary data leaving only 6 coordinates, their errors and distance
     #gaia.drop(gaia.columns[:5], axis=1, inplace=True)
